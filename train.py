@@ -60,17 +60,18 @@ def main(_):
     z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
     # z_classes = tf.placeholder(tf.float32, [FLAGS.batch_size, 2], name='z_classes')
     z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
+    
     real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
 
     net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = 2, name ='classes_embedding')
     # z --> generator for training
-    net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=True, reuse=False)
+    net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=True, reuse=False)
     # generated fake images --> discriminator
-    net_d, d_logits, _, _ = discriminator(net_g.outputs, is_train=True, reuse=False)
+    net_d, d_logits, _, _ = discriminator(net_g.outputs, FLAGS, is_train=True, reuse=False)
     # real images --> discriminator
-    _, d2_logits, _, d3_logits = discriminator(real_images, is_train=True, reuse=True)
+    _, d2_logits, _, d3_logits = discriminator(real_images, FLAGS, is_train=True, reuse=True)
     # sample_z --> generator for evaluation, set is_train to False
-    net_g2, g2_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=False, reuse=True)
+    net_g2, g2_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=False, reuse=True)
 
     # cost for updating discriminator and generator
     # discriminator: real images are labelled as 1
@@ -83,10 +84,15 @@ def main(_):
     g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits, tf.ones_like(d_logits)))
 
     # trainable parameters for updating discriminator and generator
-    g_vars = tl.layers.get_variable_with_name('generator', True, True)
-    e_vars = tl.layers.get_variable_with_name('classes_embedding', True, True)
-    d_vars = tl.layers.get_variable_with_name('discriminator', True, True)
-
+    # g_vars = tl.layers.get_variable_with_name('generator', True, True)
+    # e_vars = tl.layers.get_variable_with_name('classes_embedding', True, True)
+    # d_vars = tl.layers.get_variable_with_name('discriminator', True, True)
+    t_vars = tf.trainable_variables()
+    
+    g_vars = [var for var in t_vars if 'generator' in var.name]
+    e_vars = [var for var in t_vars if 'classes_embedding' in var.name]
+    d_vars = [var for var in t_vars if 'discriminator' in var.name]
+    
     # optimizers for updating discriminator and generator
     d_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                       .minimize(d_loss, var_list=d_vars)
