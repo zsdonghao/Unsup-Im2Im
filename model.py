@@ -4,8 +4,7 @@ import tensorlayer as tl
 from tensorlayer.layers import *
 
 
-
-def generator(inputs, is_train=True, reuse=False):
+def generator(inputs, FLAGS, is_train=True, reuse=False):
     image_size = 64
     s2, s4, s8, s16 = int(image_size/2), int(image_size/4), int(image_size/8), int(image_size/16)
     gf_dim = 64 # Dimension of gen filters in first conv layer. [64]
@@ -44,10 +43,11 @@ def generator(inputs, is_train=True, reuse=False):
                 padding='SAME', batch_size=batch_size, act=None, W_init=w_init, name='g/h4/decon2d')
         logits = net_h4.outputs
         net_h4.outputs = tf.nn.tanh(net_h4.outputs)
+    
     return net_h4, logits
 
 
-def discriminator(inputs, is_train=True, reuse=False):
+def discriminator(inputs, FLAGS, is_train=True, reuse=False):
     df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
     c_dim = FLAGS.c_dim # n_color 3
     batch_size = FLAGS.batch_size # 64
@@ -100,56 +100,56 @@ def p(inputs):
 
     with tf.variable_scope("p", reuse=reuse):
         tl.layers.set_name_reuse(reuse)
-            network = tl.layers.InputLayer(inputs, name='p/input_layer')
+        network = tl.layers.InputLayer(inputs, name='p/input_layer')
 
-            network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h1_1/conv2d')
-            network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h1_2/conv2d')
-            network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                        padding='SAME', name='p/h1/maxpool')
+        network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h1_1/conv2d')
+        network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h1_2/conv2d')
+        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='p/h1/maxpool')
 
-            network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h2_1/conv2d')
-            network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h2_2/conv2d')
-            network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                        padding='SAME', name='p/h2/maxpool')
+        network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h2_1/conv2d')
+        network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h2_2/conv2d')
+        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='p/h2/maxpool')
 
-            network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h3_1/conv2d')
-            network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h3_2/conv2d')
-            network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h3_3/conv2d')
-            network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h3_4/conv2d')
-            network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                        padding='SAME', name='p/h3/maxpool')
+        network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h3_1/conv2d')
+        network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h3_2/conv2d')
+        network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h3_3/conv2d')
+        network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h3_4/conv2d')
+        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='p/h3/maxpool')
 
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h4_1/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h4_2/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h4_3/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h4_4/conv2d')
-            network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                        padding='SAME', name='p/h4/maxpool')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h4_1/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h4_2/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h4_3/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h4_4/conv2d')
+        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='p/h4/maxpool')
 
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h5_1/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h5_2/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h5_3/conv2d')
-            network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                        padding='SAME', W_init=w_init, name='p/h5_4/conv2d')
-            network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                        padding='SAME', name='p/h5/maxpool')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h5_1/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h5_2/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h5_3/conv2d')
+        network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
+                    padding='SAME', W_init=w_init, name='p/h5_4/conv2d')
+        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='p/h5/maxpool')
 
-            network = FlattenLayer(network, name='p/flatten')
+        network = FlattenLayer(network, name='p/flatten')
 
     return network
 
