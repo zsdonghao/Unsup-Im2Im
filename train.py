@@ -170,11 +170,6 @@ def main(_):
             if np.mod(iter_counter, FLAGS.sample_step) == 0:
                 # generate and visualize generated images
                 img, errD, errG = sess.run([net_g2.outputs, d_loss, g_loss], feed_dict={z : sample_seed, real_images: sample_images})
-                '''
-                img255 = (np.array(img) + 1) / 2 * 255
-                tl.visualize.images2d(images=img255, second=0, saveable=True,
-                                name='./{}/train_{:02d}_{:04d}'.format(FLAGS.sample_dir, epoch, idx), dtype=None, fig_idx=2838)
-                '''
                 save_images(img, [8, 8],
                             './{}/train_{:02d}_{:04d}.png'.format(FLAGS.sample_dir, epoch, idx))
                 print("[Sample] d_loss: %.8f, g_loss: %.8f" % (errD, errG))
