@@ -92,8 +92,7 @@ def main(_):
     g_vars = [var for var in t_vars if 'generator' in var.name]
     e_vars = [var for var in t_vars if 'classes_embedding' in var.name]
     d_vars = [var for var in t_vars if 'discriminator' in var.name]
-    for vr in e_vars:
-        print vr.name
+    
     # optimizers for updating discriminator and generator
     d_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                       .minimize(d_loss, var_list=d_vars)
