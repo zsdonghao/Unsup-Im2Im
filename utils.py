@@ -1,5 +1,14 @@
-
+import numpy as np
 import scipy.misc
+
+def center_crop(x, crop_h, crop_w=None, resize_w=64):
+    if crop_w is None:
+        crop_w = crop_h
+    h, w = x.shape[:2]
+    j = int(round((h - crop_h)/2.))
+    i = int(round((w - crop_w)/2.))
+    return scipy.misc.imresize(x[j:j+crop_h, i:i+crop_w],
+                               [resize_w, resize_w])
 
 def merge(images, size):
     h, w = images.shape[1], images.shape[2]
@@ -14,7 +23,7 @@ def transform(image, npx=64, is_crop=True, resize_w=64):
     if is_crop:
         cropped_image = center_crop(image, npx, resize_w=resize_w)
     else:
-        cropped_image = image
+        cropped_image = scipy.misc.imresize(image, (resize_w, resize_w))
     return np.array(cropped_image)/127.5 - 1.
 
 def inverse_transform(images):
