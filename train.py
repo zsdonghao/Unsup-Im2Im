@@ -78,12 +78,8 @@ def main(_):
     g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
     g_loss = g_loss_fake + g_loss_class
 
-    # trainable parameters for updating discriminator and generator
-    # g_vars = tl.layers.get_variable_with_name('generator', True, True)
-    # e_vars = tl.layers.get_variable_with_name('classes_embedding', True, True)
-    # d_vars = tl.layers.get_variable_with_name('discriminator', True, True)
-    t_vars = tf.trainable_variables()
     
+    t_vars = tf.trainable_variables()
     g_vars = [var for var in t_vars if 'generator' in var.name]
     e_vars = [var for var in t_vars if 'classes_embedding' in var.name]
     d_vars = [var for var in t_vars if 'discriminator' in var.name]
@@ -111,23 +107,7 @@ def main(_):
     if os.path.exists(FLAGS.last_saved_model):
         saver.restore(sess, FLAGS.last_saved_model)
 
-    # # load checkpoints
-    # print("[*] Loading checkpoints...")
-    # model_dir = "%s_%s_%s" % (FLAGS.dataset, FLAGS.batch_size, FLAGS.output_size)
-    # save_dir = os.path.join(FLAGS.checkpoint_dir, model_dir)
-    # # load the latest checkpoints
-    # net_g_name = os.path.join(save_dir, 'net_g.npz')
-    # net_d_name = os.path.join(save_dir, 'net_d.npz')
-    # if not (os.path.exists(net_g_name) and os.path.exists(net_d_name)):
-    #     print("[!] Loading checkpoints failed!")
-    # else:
-    #     net_g_loaded_params = tl.files.load_npz(name=net_g_name)
-    #     net_d_loaded_params = tl.files.load_npz(name=net_d_name)
-    #     tl.files.assign_params(sess, net_g_loaded_params, net_g)
-    #     tl.files.assign_params(sess, net_d_loaded_params, net_d)
-    #     print("[*] Loading checkpoints SUCCESS!")
-
-    # TODO: use minbatch to shuffle and iterate
+    
     class1_files, class2_files, images = load_data(FLAGS.dataset)
     all_files = class1_files + class2_files
     shuffle(all_files)
@@ -138,6 +118,8 @@ def main(_):
         for bn in range(0, total_batches):
             batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
             batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
+
+            # Only for celebA dataset.. change this for others..
             batch_z_classes = [0 if images[file_name]['Male'] == True else 1 for file_name in batch_files ]
             batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
 
@@ -169,6 +151,7 @@ def main(_):
                     z_classes : [0 if batch_z_classes[i] == 1 else 1 for i in range(len(batch_z_classes))],
                 })[0]
                 
+                # Sampling the generated images..
                 for i in range(0, 10):
                     
                     real_images_255 = batch_images[i]
@@ -185,77 +168,6 @@ def main(_):
                     combined_image = np.concatenate( combined_image, axis = 1 )
                     scipy.misc.imsave('data/samples/combined_{}.jpg'.format(i), combined_image)
 
-    # data_files = glob(os.path.join("./data", FLAGS.dataset, "*.jpg"))
-    # print len(data_files), data_files[0:10]
-    
-    # TODO: shuffle sample_files each epoch
-    # sample_seed = np.random.uniform(low=-1, high=1, size=(FLAGS.sample_size, z_dim)).astype(np.float32)
-
-    # iter_counter = 0
-    # for epoch in range(FLAGS.epoch):
-    #     #shuffle data
-    #     shuffle(data_files)
-    #     print("[*]Dataset shuffled!")
-
-    #     # update sample files based on shuffled data
-    #     sample_files = data_files[0:FLAGS.sample_size]
-    #     sample = [get_image(sample_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for sample_file in sample_files]
-    #     sample_images = np.array(sample).astype(np.float32)
-    #     print("[*]Sample images updated!")
-
-    #     # load image data
-    #     batch_idxs = min(len(data_files), FLAGS.train_size) // FLAGS.batch_size
-
-    #     for idx in xrange(0, batch_idxs):
-    #         batch_files = data_files[idx*FLAGS.batch_size:(idx+1)*FLAGS.batch_size]
-    #         # get real images
-    #         batch = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
-    #         batch_images = np.array(batch).astype(np.float32)
-    #         batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
-    #         start_time = time.time()
-    #         # updates the discriminator
-    #         errD, _ = sess.run([d_loss, d_optim], feed_dict={z: batch_z, real_images: batch_images })
-    #         # updates the generator, run generator twice to make sure that d_loss does not go to zero (difference from paper)
-    #         for _ in range(2):
-    #             errG, _ = sess.run([g_loss, g_optim], feed_dict={z: batch_z})
-    #         print("Epoch: [%2d/%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
-    #                 % (epoch, FLAGS.epoch, idx, batch_idxs,
-    #                     time.time() - start_time, errD, errG))
-    #         sys.stdout.flush()
-
-    #         iter_counter += 1
-    #         if np.mod(iter_counter, FLAGS.sample_step) == 0:
-    #             # generate and visualize generated images
-    #             img, errD, errG = sess.run([net_g2.outputs, d_loss, g_loss], feed_dict={z : sample_seed, real_images: sample_images})
-    #             '''
-    #             img255 = (np.array(img) + 1) / 2 * 255
-    #             tl.visualize.images2d(images=img255, second=0, saveable=True,
-    #                             name='./{}/train_{:02d}_{:04d}'.format(FLAGS.sample_dir, epoch, idx), dtype=None, fig_idx=2838)
-    #             '''
-    #             save_images(img, [8, 8],
-    #                         './{}/train_{:02d}_{:04d}.png'.format(FLAGS.sample_dir, epoch, idx))
-    #             print("[Sample] d_loss: %.8f, g_loss: %.8f" % (errD, errG))
-    #             sys.stdout.flush()
-
-    #         # if np.mod(iter_counter, FLAGS.save_step) == 0:
-    #         #     # save current network parameters
-    #         #     print("[*] Saving checkpoints...")
-    #         #     img, errD, errG = sess.run([net_g2.outputs, d_loss, g_loss], feed_dict={z : sample_seed, real_images: sample_images})
-    #         #     model_dir = "%s_%s_%s" % (FLAGS.dataset, FLAGS.batch_size, FLAGS.output_size)
-    #         #     save_dir = os.path.join(FLAGS.checkpoint_dir, model_dir)
-    #         #     if not os.path.exists(save_dir):
-    #         #         os.makedirs(save_dir)
-    #         #     # the latest version location
-    #         #     net_g_name = os.path.join(save_dir, 'net_g.npz')
-    #         #     net_d_name = os.path.join(save_dir, 'net_d.npz')
-    #         #     # this version is for future re-check and visualization analysis
-    #         #     net_g_iter_name = os.path.join(save_dir, 'net_g_%d.npz' % iter_counter)
-    #         #     net_d_iter_name = os.path.join(save_dir, 'net_d_%d.npz' % iter_counter)
-    #         #     tl.files.save_npz(net_g.all_params, name=net_g_name, sess=sess)
-    #         #     tl.files.save_npz(net_d.all_params, name=net_d_name, sess=sess)
-    #         #     tl.files.save_npz(net_g.all_params, name=net_g_iter_name, sess=sess)
-    #         #     tl.files.save_npz(net_d.all_params, name=net_d_iter_name, sess=sess)
-    #         #     print("[*] Saving checkpoints SUCCESS!")
 
 def load_data(dataset):
     if dataset == 'celebA':
