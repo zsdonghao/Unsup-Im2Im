@@ -1,8 +1,6 @@
-
 import tensorflow as tf
 import tensorlayer as tl
 from tensorlayer.layers import *
-
 
 def generator(inputs, FLAGS, is_train=True, reuse=False):
     image_size = 64
@@ -91,71 +89,102 @@ def discriminator(inputs, FLAGS, is_train=True, reuse=False):
     return net_h4, logits, net_h5, logits2
 
 
+def imageEncoder(inputs, FLAGS, is_train=True, reuse=False):
+    df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
+    c_dim = FLAGS.c_dim # n_color 3
+    batch_size = FLAGS.batch_size # 64
+
+    w_init = tf.random_normal_initializer(stddev=0.02)
+    gamma_init = tf.random_normal_initializer(1., 0.02)
+
+    with tf.variable_scope("imageEncoder", reuse=reuse):
+        tl.layers.set_name_reuse(reuse)
+
+        net_in = InputLayer(inputs, name='p/in')
+        net_h0 = Conv2d(net_in, df_dim, (5, 5), (2, 2), act=lambda x: tl.act.lrelu(x, 0.2),
+                padding='SAME', W_init=w_init, name='p/h0/conv2d')
+
+        net_h1 = Conv2d(net_h0, df_dim*2, (5, 5), (2, 2), act=None,
+                padding='SAME', W_init=w_init, name='p/h1/conv2d')
+        net_h1 = BatchNormLayer(net_h1, act=lambda x: tl.act.lrelu(x, 0.2),
+                is_train=is_train, gamma_init=gamma_init, name='p/h1/batch_norm')
+
+        net_h2 = Conv2d(net_h1, df_dim*4, (5, 5), (2, 2), act=None,
+                padding='SAME', W_init=w_init, name='p/h2/conv2d')
+        net_h2 = BatchNormLayer(net_h2, act=lambda x: tl.act.lrelu(x, 0.2),
+                is_train=is_train, gamma_init=gamma_init, name='p/h2/batch_norm')
+
+        net_h3 = Conv2d(net_h2, df_dim*8, (5, 5), (2, 2), act=None,
+                padding='SAME', W_init=w_init, name='p/h3/conv2d')
+        net_h3 = BatchNormLayer(net_h3, act=lambda x: tl.act.lrelu(x, 0.2),
+                is_train=is_train, gamma_init=gamma_init, name='p/h3/batch_norm')
+
+        net_h4 = FlattenLayer(net_h3, name='p/h4/flatten')
+        net_h4 = DenseLayer(net_h4, n_units=FLAGS.z_dim, act=tf.identity,
+                W_init = w_init, name='p/h4/output_real_fake')
+        
+    return net_h4
 
 
-def p(inputs):
+def imageEncoder_old(inputs, output_dim = 100, is_train=True, reuse=False):
     """ CNN part of VGG19, modified from tensorlayer/example/tutorial_vgg19.py
     """
     w_init = tf.random_normal_initializer(stddev=0.02)
 
-    with tf.variable_scope("p", reuse=reuse):
+    with tf.variable_scope("imageEncoder", reuse=reuse):
         tl.layers.set_name_reuse(reuse)
-        network = tl.layers.InputLayer(inputs, name='p/input_layer')
+        network = tl.layers.InputLayer(inputs, name='imageEncoder/input_layer')
 
         network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h1_1/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h1_1/conv2d')
         network = Conv2d(network, 64, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h1_2/conv2d')
-        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                    padding='SAME', name='p/h1/maxpool')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h1_2/conv2d')
+        network = MaxPool2d(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='imageEncoder/h1/MaxPool2d')
 
         network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h2_1/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h2_1/conv2d')
         network = Conv2d(network, 128, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h2_2/conv2d')
-        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                    padding='SAME', name='p/h2/maxpool')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h2_2/conv2d')
+        network = MaxPool2d(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='imageEncoder/h2/MaxPool2d')
 
         network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h3_1/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h3_1/conv2d')
         network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h3_2/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h3_2/conv2d')
         network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h3_3/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h3_3/conv2d')
         network = Conv2d(network, 256, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h3_4/conv2d')
-        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                    padding='SAME', name='p/h3/maxpool')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h3_4/conv2d')
+        network = MaxPool2d(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='imageEncoder/h3/MaxPool2d')
 
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h4_1/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h4_1/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h4_2/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h4_2/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h4_3/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h4_3/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h4_4/conv2d')
-        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                    padding='SAME', name='p/h4/maxpool')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h4_4/conv2d')
+        network = MaxPool2d(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='imageEncoder/h4/MaxPool2d')
 
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h5_1/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h5_1/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h5_2/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h5_2/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h5_3/conv2d')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h5_3/conv2d')
         network = Conv2d(network, 512, (3, 3), (1, 1), act=tf.nn.relu,
-                    padding='SAME', W_init=w_init, name='p/h5_4/conv2d')
-        network = MaxPool(network, filter_size=(2, 2), strides=(2, 2),
-                    padding='SAME', name='p/h5/maxpool')
+                    padding='SAME', W_init=w_init, name='imageEncoder/h5_4/conv2d')
+        network = MaxPool2d(network, filter_size=(2, 2), strides=(2, 2),
+                    padding='SAME', name='imageEncoder/h5/MaxPool2d')
 
-        network = FlattenLayer(network, name='p/flatten')
+        network = FlattenLayer(network, name='imageEncoder/flatten')
+
+        network = DenseLayer(network, n_units=output_dim, act=tf.identity,
+                W_init = w_init, name='imageEncoder/reduced_output')
 
     return network
-
-
-
-
-
-
-#
