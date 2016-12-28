@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.misc
+import os
 
 def center_crop(x, crop_h, crop_w=None, resize_w=64):
     if crop_w is None:
@@ -43,3 +44,14 @@ def get_image(image_path, image_size, is_crop=True, resize_w=64, is_grayscale = 
 
 def save_images(images, size, image_path):
     return imsave(inverse_transform(images), size, image_path)
+
+def combine_and_save_image_sets(image_sets, directory):
+    for i in range(len(image_sets[0])):
+        combined_image = []
+        for set_no in range(len(image_sets)):
+            combined_image.append( image_sets[set_no][i] )
+            combined_image.append( np.zeros((image_sets[set_no][i].shape[0], 5, 3)) )
+        combined_image = np.concatenate( combined_image, axis = 1 )
+
+        scipy.misc.imsave( os.path.join( directory,  'combined_{}.jpg'.format(i) ), combined_image)
+

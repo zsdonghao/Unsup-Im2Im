@@ -33,7 +33,7 @@ flags.DEFINE_integer("sample_step", 200, "The interval of generating sample. [50
 flags.DEFINE_integer("save_step", 500, "The interval of saveing checkpoints. [500]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
-flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
+flags.DEFINE_string("sample_dir", "data/samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
@@ -145,7 +145,7 @@ def train_ac_gan():
                     z_classes : [0 if batch_z_classes[i] == 1 else 1 for i in range(len(batch_z_classes))],
                 })[0]
                 
-                sample_images(batch_images, generated_samples, generated_samples_other_class)
+                combine_and_save_image_sets( [batch_images, generated_samples, generated_samples_other_class], FLAGS.sample_dir)
 
 def train_imageEncoder():
     z_dim = FLAGS.z_dim
@@ -224,25 +224,7 @@ def main(_):
         train_imageEncoder()
 
     """ Step 1: Train a G which generates plausible images conditioned on given class """
-                       
-
-def sample_images(batch_images, generated_samples, generated_samples_other_class):
-    
-    for i in range(0, min(10, len(batch_images))):
-        real_images_255 = batch_images[i]
-        scipy.misc.imsave( 'data/samples/real_{}.jpg'.format(i) , real_images_255) 
-
-        
-        fake_images_255 = generated_samples[i]
-        scipy.misc.imsave('data/samples/fake_image_{}.jpg'.format(i), fake_images_255)
-
-        fake_images_255_other_class = generated_samples_other_class[i]
-        scipy.misc.imsave('data/samples/fake_other_{}.jpg'.format(i), fake_images_255_other_class)
-
-        combined_image = [fake_images_255] + [np.zeros((64, 5, 3))] + [fake_images_255_other_class]
-        combined_image = np.concatenate( combined_image, axis = 1 )
-        scipy.misc.imsave('data/samples/combined_{}.jpg'.format(i), combined_image)
-
+                           
 if __name__ == '__main__':
     # load_data("celebA")
     tf.app.run()
