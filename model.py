@@ -90,6 +90,7 @@ def discriminator(inputs, FLAGS, is_train=True, reuse=False):
 
 
 def imageEncoder(inputs, FLAGS, is_train=True, reuse=False):
+    # Same architecure as the discriminator, different last layer
     df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
     c_dim = FLAGS.c_dim # n_color 3
     batch_size = FLAGS.batch_size # 64

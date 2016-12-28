@@ -10,6 +10,7 @@ from tensorlayer.layers import *
 from glob import glob
 from random import shuffle
 import argparse
+import data_loader
 
 from model import *
 from utils import *
@@ -40,40 +41,24 @@ flags.DEFINE_string("last_saved_model", "data/Models/model_epoch_3.ckpt", "Path 
 
 FLAGS = flags.FLAGS
 
-def main(_):
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--train_step', type=str, default="2",
-                       help='Step of the training')
-
-    args = parser.parse_args()
-
-    if args.train_step == "testing":
-        FLAGS.batch_size = 1
-
-    pp.pprint(flags.FLAGS.__flags)
-
-    if not os.path.exists(FLAGS.checkpoint_dir):
-        os.makedirs(FLAGS.checkpoint_dir)
-    if not os.path.exists(FLAGS.sample_dir):
-        os.makedirs(FLAGS.sample_dir)
-
-    """ Step 1: Train a G which generates plausible images conditioned on given class """
+def train_ac_gan():
     z_dim = FLAGS.z_dim
-
     z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
-    # z_classes = tf.placeholder(tf.float32, [FLAGS.batch_size, 2], name='z_classes')
     z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
-    
     real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
-
+    
+    # z embedding
     net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = 2, name ='classes_embedding')
+    
     # z --> generator for training
     net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=True, reuse=False)
+    
     # generated fake images --> discriminator
     net_d, d_logits_fake, _, d_logits_fake_class = discriminator(net_g.outputs, FLAGS, is_train=True, reuse=False)
+    
     # real images --> discriminator
     _, d_logits_real, _, d_logits_real_class = discriminator(real_images, FLAGS, is_train=True, reuse=True)
+    
     # sample_z --> generator for evaluation, set is_train to False
     net_g2, g2_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=False, reuse=True)
 
@@ -84,6 +69,7 @@ def main(_):
     d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.zeros_like(d_logits_fake)))     # fake == 0
     d_loss_class = tl.cost.cross_entropy(d_logits_real_class, z_classes)                                                   # cross-entropy
     d_loss = d_loss_real + d_loss_fake + d_loss_class
+    
     # generator: try to make the the fake images look real (1)
     g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
     g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
@@ -101,112 +87,144 @@ def main(_):
     g_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                       .minimize(g_loss, var_list=g_vars + e_vars)
 
-    """ Step 2: Train a P which is able to encode class A images to Z, and allow G to reconstruct the images """
 
-
-    """ Step 3: Input images of class A, output images of class B """
-
-
-    """ """
     sess=tf.Session()
     tl.ops.set_gpu_fraction(sess=sess, gpu_fraction=0.998)
     
-
     saver = tf.train.Saver()
+    
+    sess.run(tf.initialize_all_variables())
 
-    if args.train_step == "1":
-        sess.run(tf.initialize_all_variables())
+    if FLAGS.last_saved_model:
+        print "[*] Loading Presaved model", FLAGS.last_saved_model
+        saver.restore(sess, FLAGS.last_saved_model)
+    else:
+        print "[*] No Previous model found, retraining..."
 
-        if os.path.exists(FLAGS.last_saved_model):
-            saver.restore(sess, FLAGS.last_saved_model)
-        class1_files, class2_files, images = load_data(FLAGS.dataset)
-        all_files = class1_files + class2_files
-        shuffle(all_files)
-        print "all_files", len(all_files)
-        total_batches = len(all_files)/FLAGS.batch_size
-        print "Total_batces", total_batches
-        for epoch in range(FLAGS.epoch):
-            for bn in range(0, total_batches):
-                batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
-                batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
+    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
 
-                # Only for celebA dataset.. change this for others..
-                batch_z_classes = [0 if images[file_name]['Male'] == True else 1 for file_name in batch_files ]
-                batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
+    all_files = class1_files + class2_files
+    shuffle(all_files)
+    print "all_files", len(all_files)
+    total_batches = len(all_files)/FLAGS.batch_size
+    print "Total_batches", total_batches
+    
+    for epoch in range(FLAGS.epoch):
+        for bn in range(0, total_batches):
+            batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
+            batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
 
-                errD, _ = sess.run([d_loss, d_optim], feed_dict={
+            # Only for celebA dataset.. change this for others..
+            batch_z_classes = [0 if class_flag[file_name] == True else 1 for file_name in batch_files ]
+            batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
+
+            errD, _ = sess.run([d_loss, d_optim], feed_dict={
+                z_noise: batch_z, 
+                z_classes : batch_z_classes,
+                real_images: batch_images 
+            })
+
+            for i in range(0,2):
+                errG, _ = sess.run([g_loss, g_optim], feed_dict={
                     z_noise: batch_z, 
                     z_classes : batch_z_classes,
-                    real_images: batch_images 
                 })
 
-                for i in range(0,2):
-                    errG, _ = sess.run([g_loss, g_optim], feed_dict={
-                        z_noise: batch_z, 
-                        z_classes : batch_z_classes,
-                    })
+            print "d_loss={}\t g_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errD, errG, epoch, bn, total_batches)
 
-                print "d_loss={}\t g_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errD, errG, epoch, bn, total_batches)
-
-                if bn % FLAGS.save_step == 0:
-                    print "[*]Saving Model, sampling images..."
-                    save_path = saver.save(sess, "data/Models/model_epoch_{}.ckpt".format(epoch))
-                    generated_samples = sess.run([net_g2.outputs], feed_dict={
-                        z_noise: batch_z, 
-                        z_classes : batch_z_classes,
-                    })[0]
-
-                    generated_samples_other_class = sess.run([net_g2.outputs], feed_dict={
-                        z_noise: batch_z, 
-                        z_classes : [0 if batch_z_classes[i] == 1 else 1 for i in range(len(batch_z_classes))],
-                    })[0]
-                    
-                    sample_images(batch_images, generated_samples, generated_samples_other_class)
-                    # Sampling the generated images..
-
-    if args.train_step == "2":
-        net_p = imageEncoder(real_images, FLAGS)
-        net_g3, g3_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), FLAGS, is_train=False, reuse=True)
-
-        t_vars = tf.trainable_variables()
-        p_vars = [var for var in t_vars if 'imageEncoder' in var.name]
-
-
-        p_loss = tf.reduce_mean(tf.square(tf.sub(real_images, net_g3.outputs )))
-
-        p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
-                      .minimize(p_loss, var_list=p_vars)
-
-        sess.run(tf.initialize_all_variables())
-        if os.path.exists(FLAGS.last_saved_model):
-            saver.restore(sess, FLAGS.last_saved_model)
-
-        class1_files, class2_files, images = load_data(FLAGS.dataset)
-        all_files = class1_files + class2_files
-        shuffle(all_files)
-        print "all_files", len(all_files)
-        total_batches = len(all_files)/FLAGS.batch_size
-        print "Total_batces", total_batches
-        for epoch in range(FLAGS.epoch):
-            for bn in range(0, total_batches):
-                batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
-                batch_z_classes = [0 if images[file_name]['Male'] == True else 1 for file_name in batch_files ]
-                batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
-
-                errP, _, gen_images = sess.run([p_loss, p_optim, net_g3.outputs], feed_dict={
+            if bn % FLAGS.save_step == 0:
+                print "[*]Saving Model, sampling images..."
+                save_path = saver.save(sess, "data/Models/model_epoch_{}.ckpt".format(epoch))
+                generated_samples = sess.run([net_g2.outputs], feed_dict={
+                    z_noise: batch_z, 
                     z_classes : batch_z_classes,
-                    real_images: batch_images
-                })
+                })[0]
 
-                print "p_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errP, epoch, bn, total_batches) 
+                generated_samples_other_class = sess.run([net_g2.outputs], feed_dict={
+                    z_noise: batch_z, 
+                    z_classes : [0 if batch_z_classes[i] == 1 else 1 for i in range(len(batch_z_classes))],
+                })[0]
+                
+                sample_images(batch_images, generated_samples, generated_samples_other_class)
 
-                if bn % FLAGS.sample_step == 0:
-                    print "[*]Sampling images"
-                    sample_images(batch_images, gen_images, batch_images)
+def train_imageEncoder():
+    z_dim = FLAGS.z_dim
 
-                if bn%FLAGS.save_step == 0:
-                    print "[*]Saving Model"
-                    save_path = saver.save(sess, "data/Models/model_step_2_epoch_{}.ckpt".format(epoch))                    
+    z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
+    z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
+    real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
+
+    net_p = imageEncoder(real_images, FLAGS)
+    net_g3, g3_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), FLAGS, is_train=False, reuse=True)
+
+    t_vars = tf.trainable_variables()
+    p_vars = [var for var in t_vars if 'imageEncoder' in var.name]
+    
+    p_loss = tf.reduce_mean(tf.square(tf.sub(real_images, net_g3.outputs )))
+    p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
+                  .minimize(p_loss, var_list=p_vars)
+
+    sess.run(tf.initialize_all_variables())
+    
+    # LOAD SAVED MODEL
+
+    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
+    all_files = class1_files + class2_files
+    shuffle(all_files)
+    print "all_files", len(all_files)
+    total_batches = len(all_files)/FLAGS.batch_size
+    print "Total_batces", total_batches
+    for epoch in range(FLAGS.epoch):
+        for bn in range(0, total_batches):
+            batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
+            batch_z_classes = [0 if class_flag[file_name] == True else 1 for file_name in batch_files ]
+            batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
+
+            errP, _, gen_images = sess.run([p_loss, p_optim, net_g3.outputs], feed_dict={
+                z_classes : batch_z_classes,
+                real_images: batch_images
+            })
+
+            print "p_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errP, epoch, bn, total_batches) 
+
+            if bn % FLAGS.sample_step == 0:
+                print "[*]Sampling images"
+                sample_images(batch_images, gen_images, batch_images)
+
+            if bn%FLAGS.save_step == 0:
+                print "[*]Saving Model"
+                save_path = saver.save(sess, "data/Models/model_step_2_epoch_{}.ckpt".format(epoch))    
+
+def main(_):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--train_step', type=str, default="ac_gan",
+                       help='Step of the training : ac_gan, imageEncoder')
+
+    parser.add_argument('--resume_from_model', type=str, default=None,
+                       help='Resume Training from')
+
+    args = parser.parse_args()
+
+
+    # pp.pprint(flags.FLAGS.__flags)
+
+    if not os.path.exists(FLAGS.checkpoint_dir):
+        os.makedirs(FLAGS.checkpoint_dir)
+    if not os.path.exists(FLAGS.sample_dir):
+        os.makedirs(FLAGS.sample_dir)
+
+    
+    FLAGS.last_saved_model = args.resume_from_model
+    
+    if args.train_step == "ac_gan":
+        train_ac_gan()
+    
+    elif args.train_step == "imageEncoder":
+        train_imageEncoder()
+
+    """ Step 1: Train a G which generates plausible images conditioned on given class """
+                       
 
 def sample_images(batch_images, generated_samples, generated_samples_other_class):
     
@@ -224,43 +242,6 @@ def sample_images(batch_images, generated_samples, generated_samples_other_class
         combined_image = [fake_images_255] + [np.zeros((64, 5, 3))] + [fake_images_255_other_class]
         combined_image = np.concatenate( combined_image, axis = 1 )
         scipy.misc.imsave('data/samples/combined_{}.jpg'.format(i), combined_image)
-
-def load_data(dataset):
-    if dataset == 'celebA':
-        attr_file = os.path.join("./data", dataset, "list_attr_celeba.txt")
-        attr_rows = open(attr_file).read().split('\n')
-        attr_names = attr_rows[1].split()
-
-        images = {}
-        for img_row in attr_rows[2:]:
-            row = img_row.split()
-            if len(row) == 0:
-                break
-            img_name = row[0]
-            attr_flags = row[1:]
-            row_dic = {}
-            for i, attr_name in enumerate(attr_names):
-                if attr_flags[i] == "1":
-                    row_dic[attr_name] = True
-                else:
-                    row_dic[attr_name] = False
-            images[os.path.join("./data", dataset,img_name)] = row_dic
-        
-        # return images
-        class1_files = [ name for name in images if images[name]['Male'] == True]
-        class2_files = [ name for name in images if images[name]['Male'] == False]
-
-        shuffle(class1_files)
-        shuffle(class2_files)
-
-        min_length = min(len(class1_files), len(class2_files))
-        
-        class1_files = class1_files[0:min_length]
-        class2_files = class2_files[0:min_length]
-
-
-        return class1_files, class2_files, images
-
 
 if __name__ == '__main__':
     # load_data("celebA")
