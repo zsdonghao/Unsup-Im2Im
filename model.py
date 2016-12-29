@@ -86,10 +86,11 @@ def discriminator(inputs, FLAGS, is_train=True, reuse=False):
                 W_init = w_init, name='d/h5/output_classes')
         logits2 = net_h5.outputs
         net_h5.outputs = tf.nn.softmax(net_h5.outputs)
-    return net_h4, logits, net_h5, logits2
+    return net_h4, logits, net_h5, logits2, net_h3
 
 
 def imageEncoder(inputs, FLAGS, is_train=True, reuse=False):
+    # Same architecure as the discriminator, different last layer
     df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
     c_dim = FLAGS.c_dim # n_color 3
     batch_size = FLAGS.batch_size # 64
