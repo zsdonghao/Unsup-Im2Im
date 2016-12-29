@@ -76,29 +76,27 @@ def train_ac_gan():
     g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
     g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
     g_loss = g_loss_fake + g_loss_class
-
     
     t_vars = tf.trainable_variables()
     g_vars = [var for var in t_vars if 'generator' in var.name]
     e_vars = [var for var in t_vars if 'classes_embedding' in var.name]
     d_vars = [var for var in t_vars if 'discriminator' in var.name]
-
+    
     # optimizers for updating discriminator and generator
     d_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                       .minimize(d_loss, var_list=d_vars)
     g_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                       .minimize(g_loss, var_list=g_vars + e_vars)
-
-
+    
     sess=tf.Session()
     tl.ops.set_gpu_fraction(sess=sess, gpu_fraction=0.998)
     
     saver = tf.train.Saver()
     
     sess.run(tf.initialize_all_variables())
-
-
+    
     saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
+    print "[*] Model Loaded"
     
     net_g_name = os.path.join(FLAGS.checkpoint_dir, 'net_g.npz')
     net_d_name = os.path.join(FLAGS.checkpoint_dir, 'net_d.npz')
@@ -191,9 +189,8 @@ def train_imageEncoder():
     net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g3.outputs, FLAGS, is_train = False, reuse = False)
     _, _, _, _, df_real = discriminator(real_images, FLAGS, is_train = False, reuse = True)
 
-
-    g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
-    g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
+    # g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
+    # g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
 
     p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(real_images, net_g3.outputs )))
     p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
@@ -205,7 +202,7 @@ def train_imageEncoder():
         else:
             p_reg_loss += FLAGS.weight_decay * tf.nn.l2_loss(p_var)
 
-    p_loss = p_loss_l2 + (p_loss_df * 0.5) + g_loss_fake + g_loss_class + p_reg_loss
+    p_loss = p_loss_l2 + (p_loss_df * 0.5) + p_reg_loss
     
     p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                   .minimize(p_loss, var_list=p_vars)
@@ -263,6 +260,7 @@ def train_imageEncoder():
                 print "[*]Saving Model"
                 save_path = saver.save(sess, "data/Models/model_step_2_epoch_{}.ckpt".format(epoch))    
                 tl.files.save_npz(net_p.all_params, name=net_p_name, sess=sess)
+                tl.files.save_npz(net_p.all_params, name=net_p_name + "_" + str(epoch), sess=sess)
                 print "[*]Model p saved"
 
 def main(_):
