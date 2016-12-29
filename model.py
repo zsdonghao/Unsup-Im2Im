@@ -86,7 +86,7 @@ def discriminator(inputs, FLAGS, is_train=True, reuse=False):
                 W_init = w_init, name='d/h5/output_classes')
         logits2 = net_h5.outputs
         net_h5.outputs = tf.nn.softmax(net_h5.outputs)
-    return net_h4, logits, net_h5, logits2
+    return net_h4, logits, net_h5, logits2, net_h3
 
 
 def imageEncoder(inputs, FLAGS, is_train=True, reuse=False):
