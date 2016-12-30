@@ -19,7 +19,7 @@ pp = pprint.PrettyPrinter()
 
 
 flags = tf.app.flags
-flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
+flags.DEFINE_integer("epoch", 200, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("weight_decay", 1e-5, "Weight decay for l2 loss")
@@ -28,11 +28,12 @@ flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 64, "The number of batch images [64]")
 flags.DEFINE_integer("image_size", 64, "The size of image to use (will be center cropped) [108]")
 flags.DEFINE_integer("z_dim", 98, "Size of Noise embedding")
+flags.DEFINE_integer("class_embedding_size", 2, "Size of class embedding")
 flags.DEFINE_integer("output_size", 64, "The size of the output images to produce [64]")
 flags.DEFINE_integer("sample_size", 64, "The number of sample images [64]")
 flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
-flags.DEFINE_integer("sample_step", 100, "The interval of generating sample. [500]")
-flags.DEFINE_integer("save_step", 500, "The interval of saveing checkpoints. [500]")
+flags.DEFINE_integer("sample_step", 50, "The interval of generating sample. [500]")
+flags.DEFINE_integer("save_step", 100, "The interval of saveing checkpoints. [200]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("checkpoint_dir", "data/Models", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "data/samples", "Directory name to save the image samples [samples]")
@@ -50,19 +51,22 @@ def train_ac_gan():
     real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
     
     # z embedding
-    net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = 2, name ='classes_embedding')
+    if FLAGS.class_embedding_size != None:
+        net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = FLAGS.class_embedding_size, name ='classes_embedding')
+    else:
+        net_z_classes = InputLayer(inputs = tf.one_hot(z_classes), name ='classes_embedding')
     
     # z --> generator for training
-    net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=True, reuse=False)
+    net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=True, reuse=False)
     
     # generated fake images --> discriminator
-    net_d, d_logits_fake, _, d_logits_fake_class, _ = discriminator(net_g.outputs, FLAGS, is_train=True, reuse=False)
+    net_d, d_logits_fake, _, d_logits_fake_class, _ = discriminator(net_g.outputs, is_train=True, reuse=False)
     
     # real images --> discriminator
-    _, d_logits_real, _, d_logits_real_class, _ = discriminator(real_images, FLAGS, is_train=True, reuse=True)
+    _, d_logits_real, _, d_logits_real_class, _ = discriminator(real_images, is_train=True, reuse=True)
     
     # sample_z --> generator for evaluation, set is_train to False
-    net_g2, g2_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), FLAGS, is_train=False, reuse=True)
+    net_g2, g2_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=False, reuse=True)
 
     # cost for updating discriminator and generator
     # discriminator: real images are labelled as 1
@@ -95,6 +99,7 @@ def train_ac_gan():
     
     sess.run(tf.initialize_all_variables())
     
+
     saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
     print "[*] Model Loaded"
     
@@ -102,16 +107,16 @@ def train_ac_gan():
     net_d_name = os.path.join(FLAGS.checkpoint_dir, 'net_d.npz')
     net_e_name = os.path.join(FLAGS.checkpoint_dir, 'net_e.npz')
 
-    if not (os.path.exists(net_g_name) and os.path.exists(net_d_name)):
-        print("[!] Could not load weights from npz files")
-    else:
-        net_g_loaded_params = tl.files.load_npz(name=net_g_name)
-        net_d_loaded_params = tl.files.load_npz(name=net_d_name)
-        net_e_loaded_params = tl.files.load_npz(name=net_e_name)
-        tl.files.assign_params(sess, net_g_loaded_params, net_g)
-        tl.files.assign_params(sess, net_d_loaded_params, net_d)
-        tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
-        print("[*] Loading checkpoints SUCCESS!")
+    # if not (os.path.exists(net_g_name) and os.path.exists(net_d_name)):
+    #     print("[!] Could not load weights from npz files")
+    # else:
+    #     net_g_loaded_params = tl.files.load_npz(name=net_g_name)
+    #     net_d_loaded_params = tl.files.load_npz(name=net_d_name)
+    #     net_e_loaded_params = tl.files.load_npz(name=net_e_name)
+    #     tl.files.assign_params(sess, net_g_loaded_params, net_g)
+    #     tl.files.assign_params(sess, net_d_loaded_params, net_d)
+    #     tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
+    #     print("[*] Loading checkpoints SUCCESS!")
 
     class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
 
@@ -128,7 +133,7 @@ def train_ac_gan():
 
             # Only for celebA dataset.. change this for others..
             batch_z_classes = [0 if class_flag[file_name] == True else 1 for file_name in batch_files ]
-            batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
+            batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0, random_flip = True) for batch_file in batch_files]
 
             errD, _ = sess.run([d_loss, d_optim], feed_dict={
                 z_noise: batch_z, 
@@ -176,23 +181,28 @@ def train_imageEncoder():
 
     z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
     z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
-    real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
+    # real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
 
-    net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = 2, name ='classes_embedding')
+    if FLAGS.class_embedding_size != None:
+        net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = FLAGS.class_embedding_size, name ='classes_embedding')
+    else:
+        net_z_classes = InputLayer(inputs = tf.one_hot(z_classes), name ='classes_embedding')
     
-    net_p = imageEncoder(real_images, FLAGS)
-    net_g3, g3_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), FLAGS, is_train=False)
+    # net_g produces sample images
+    net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=False)
+    net_p = imageEncoder(net_g.outputs, FLAGS)
+    net_g2, g2_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), is_train=False, reuse = True)
 
     t_vars = tf.trainable_variables()
     p_vars = [var for var in t_vars if 'imageEncoder' in var.name]
     
-    net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g3.outputs, FLAGS, is_train = False, reuse = False)
-    _, _, _, _, df_real = discriminator(real_images, FLAGS, is_train = False, reuse = True)
+    net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g2.outputs, is_train = False, reuse = False)
+    _, _, _, _, df_real = discriminator(net_g.outputs, is_train = False, reuse = True)
 
     # g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
     # g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
 
-    p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(real_images, net_g3.outputs )))
+    p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(net_g.outputs, net_g2.outputs )))
     p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
     
     p_reg_loss = None
@@ -225,9 +235,11 @@ def train_imageEncoder():
         net_g_loaded_params = tl.files.load_npz(name=net_g_name)
         net_d_loaded_params = tl.files.load_npz(name=net_d_name)
         net_e_loaded_params = tl.files.load_npz(name=net_e_name)
-        tl.files.assign_params(sess, net_g_loaded_params, net_g3)
+        
+        tl.files.assign_params(sess, net_g_loaded_params, net_g2)
         tl.files.assign_params(sess, net_d_loaded_params, net_d)
         tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
+        
         print("[*] Loading checkpoints SUCCESS!")
 
 
@@ -241,13 +253,13 @@ def train_imageEncoder():
     print "Total_batces", total_batches
     for epoch in range(FLAGS.epoch):
         for bn in range(0, total_batches):
-            batch_files = all_files[bn*FLAGS.batch_size : (bn + 1) * FLAGS.batch_size]
-            batch_z_classes = [0 if class_flag[file_name] == True else 1 for file_name in batch_files ]
-            batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0) for batch_file in batch_files]
+            batch_z_classes = [0 if random.random() > 0.5 else 1 for i in range(FLAGS.batch_size)]
+            batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
+            # batch_images = sess.run(net_g2.outputs, feed_dict ={z_noise: batch_z, z_classes : batch_z_classes })
 
-            errP, _, gen_images = sess.run([p_loss, p_optim, net_g3.outputs], feed_dict={
+            errP, _, batch_images, gen_images = sess.run([p_loss, p_optim, net_g.outputs, net_g2.outputs], feed_dict={
                 z_classes : batch_z_classes,
-                real_images: batch_images
+                z_noise : batch_z
             })
 
             print "p_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errP, epoch, bn, total_batches) 
