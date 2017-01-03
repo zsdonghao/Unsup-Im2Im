@@ -181,7 +181,8 @@ def train_imageEncoder():
 
     z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
     z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
-    # real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
+    
+    real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
 
     if FLAGS.class_embedding_size != None:
         net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = FLAGS.class_embedding_size, name ='classes_embedding')
@@ -190,19 +191,19 @@ def train_imageEncoder():
     
     # net_g produces sample images
     net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=False)
-    net_p = imageEncoder(net_g.outputs, FLAGS)
+    net_p = imageEncoder(real_images, FLAGS)
     net_g2, g2_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), is_train=False, reuse = True)
 
     t_vars = tf.trainable_variables()
     p_vars = [var for var in t_vars if 'imageEncoder' in var.name]
     
     net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g2.outputs, is_train = False, reuse = False)
-    _, _, _, _, df_real = discriminator(net_g.outputs, is_train = False, reuse = True)
+    _, _, _, _, df_real = discriminator(real_images, is_train = False, reuse = True)
 
     # g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
     # g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
 
-    p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(net_g.outputs, net_g2.outputs )))
+    p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(real_images, net_g2.outputs )))
     p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
     
     # p_reg_loss = None
@@ -212,7 +213,7 @@ def train_imageEncoder():
     #     else:
     #         p_reg_loss += FLAGS.weight_decay * tf.nn.l2_loss(p_var)
 
-    p_loss = p_loss_l2 + (p_loss_df * 0.5) #+ p_reg_loss
+    p_loss = p_loss_l2 #+ (p_loss_df * 0.5) #+ p_reg_loss
     
     p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                   .minimize(p_loss, var_list=p_vars)
@@ -255,13 +256,13 @@ def train_imageEncoder():
         for bn in range(0, total_batches):
             batch_z_classes = [0 if random.random() > 0.5 else 1 for i in range(FLAGS.batch_size)]
             batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
-            # batch_images = sess.run(net_g2.outputs, feed_dict ={z_noise: batch_z, z_classes : batch_z_classes })
-
-            errP, _, batch_images, gen_images = sess.run([p_loss, p_optim, net_g.outputs, net_g2.outputs], feed_dict={
+            batch_images = sess.run(net_g.outputs, feed_dict ={z_noise: batch_z, z_classes : batch_z_classes })
+            # gen_images = batch_images
+            gen_images, errP = sess.run([net_g2.outputs, p_loss], feed_dict={
                 z_classes : batch_z_classes,
-                z_noise : batch_z
+                real_images : batch_images
             })
-
+            # print "epoch={}\t batch_no={}\t total_batches={}".format(epoch, bn, total_batches) 
             print "p_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errP, epoch, bn, total_batches) 
 
             if bn % FLAGS.sample_step == 0:
