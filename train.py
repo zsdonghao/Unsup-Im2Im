@@ -205,14 +205,14 @@ def train_imageEncoder():
     p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(net_g.outputs, net_g2.outputs )))
     p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
     
-    p_reg_loss = None
-    for p_var in p_vars:
-        if p_reg_loss == None:
-            p_reg_loss = FLAGS.weight_decay * tf.nn.l2_loss(p_var)
-        else:
-            p_reg_loss += FLAGS.weight_decay * tf.nn.l2_loss(p_var)
+    # p_reg_loss = None
+    # for p_var in p_vars:
+    #     if p_reg_loss == None:
+    #         p_reg_loss = FLAGS.weight_decay * tf.nn.l2_loss(p_var)
+    #     else:
+    #         p_reg_loss += FLAGS.weight_decay * tf.nn.l2_loss(p_var)
 
-    p_loss = p_loss_l2 + (p_loss_df * 0.5) + p_reg_loss
+    p_loss = p_loss_l2 + (p_loss_df * 0.5) #+ p_reg_loss
     
     p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                   .minimize(p_loss, var_list=p_vars)
