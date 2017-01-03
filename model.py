@@ -2,7 +2,8 @@ import tensorflow as tf
 import tensorlayer as tl
 from tensorlayer.layers import *
 
-def generator(inputs, FLAGS, is_train=True, reuse=False):
+def generator(inputs, is_train=True, reuse=False):
+    FLAGS = tf.app.flags.FLAGS
     image_size = 64
     s2, s4, s8, s16 = int(image_size/2), int(image_size/4), int(image_size/8), int(image_size/16)
     gf_dim = 64 # Dimension of gen filters in first conv layer. [64]
@@ -45,7 +46,8 @@ def generator(inputs, FLAGS, is_train=True, reuse=False):
     return net_h4, logits
 
 
-def discriminator(inputs, FLAGS, is_train=True, reuse=False):
+def discriminator(inputs, is_train=True, reuse=False):
+    FLAGS = tf.app.flags.FLAGS
     df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
     c_dim = FLAGS.c_dim # n_color 3
     batch_size = FLAGS.batch_size # 64
@@ -89,8 +91,9 @@ def discriminator(inputs, FLAGS, is_train=True, reuse=False):
     return net_h4, logits, net_h5, logits2, net_h3
 
 
-def imageEncoder(inputs, FLAGS, is_train=True, reuse=False):
+def imageEncoder(inputs, is_train=True, reuse=False):
     # Same architecure as the discriminator, different last layer
+    FLAGS = tf.app.flags.FLAGS
     df_dim = 64 # Dimension of discrim filters in first conv layer. [64]
     c_dim = FLAGS.c_dim # n_color 3
     batch_size = FLAGS.batch_size # 64

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.misc
 import os
+import random
 
 def center_crop(x, crop_h, crop_w=None, resize_w=64):
     if crop_w is None:
@@ -39,8 +40,12 @@ def imread(path, is_grayscale = False):
 def imsave(images, size, path):
     return scipy.misc.imsave(path, merge(images, size))
 
-def get_image(image_path, image_size, is_crop=True, resize_w=64, is_grayscale = False):
-    return transform(imread(image_path, is_grayscale), image_size, is_crop, resize_w)
+def get_image(image_path, image_size, is_crop=True, resize_w=64, is_grayscale = False, random_flip = False):
+    img = transform(imread(image_path, is_grayscale), image_size, is_crop, resize_w)
+    if random_flip:
+        if random.random() > 0.5:
+            img = np.fliplr(img)
+    return img
 
 def save_images(images, size, image_path):
     return imsave(inverse_transform(images), size, image_path)
