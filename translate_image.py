@@ -49,9 +49,9 @@ def main():
     sess=tf.Session()
     sess.run(tf.initialize_all_variables())
 
-    net_g_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_g.npz'.fromat(FLAGS.dataset))
-    net_e_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_e.npz'.fromat(FLAGS.dataset))
-    net_p_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_p.npz'.fromat(FLAGS.dataset))
+    net_g_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_g.npz'.format(FLAGS.dataset))
+    net_e_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_e.npz'.format(FLAGS.dataset))
+    net_p_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_p.npz'.format(FLAGS.dataset))
 
     if not (os.path.exists(net_g_name) and os.path.exists(net_e_name) and os.path.exists(net_p_name)):
         print("[!] Loading checkpoints failed!")
@@ -67,7 +67,7 @@ def main():
         
         print("[*] Loading checkpoints SUCCESS!")
 
-    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
+    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset, split = "test")
     all_files = class1_files + class2_files
     shuffle(all_files)
 

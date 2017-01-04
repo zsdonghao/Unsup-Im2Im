@@ -93,8 +93,8 @@ def train_ac_gan():
     net_d_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_d.npz'.format(FLAGS.dataset))
     net_e_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_e.npz'.format(FLAGS.dataset))
 
-    if not FLAGS.retrain_ac_gan:
-        if (os.path.exists(net_g_name) and os.path.exists(net_d_name) and os.path.exists(net_e_name)):
+    if not FLAGS.retrain:
+        if not (os.path.exists(net_g_name) and os.path.exists(net_d_name) and os.path.exists(net_e_name)):
             print("[!] Could not load weights from npz files")
         else:
             net_g_loaded_params = tl.files.load_npz(name=net_g_name)
@@ -107,7 +107,7 @@ def train_ac_gan():
     else:
         print "[*] Retraining AC GAN"
 
-    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
+    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset, split = "train")
 
     all_files = class1_files + class2_files
     shuffle(all_files)
@@ -233,7 +233,7 @@ def train_imageEncoder():
         print("[*] Loading checkpoints SUCCESS!")
 
     net_p_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_p.npz'.format(FLAGS.dataset))
-    if not FLAGS.retrain_imageEncoder:
+    if not FLAGS.retrain:
         net_p_loaded_params = tl.files.load_npz(name=net_p_name)
         tl.files.assign_params(sess, net_p_loaded_params, net_p)
         print("[*] Loaded Pretrained Image Encoder!")
@@ -273,11 +273,8 @@ def main(_):
     parser.add_argument('--train_step', type=str, default="ac_gan",
                        help='Step of the training : ac_gan, imageEncoder')
 
-    parser.add_argument('--retrain_ac_gan', type=bool, default=False,
-                       help='Resume Training from')
-
-    parser.add_argument('--retrain_imageEncoder', type=bool, default=True,
-                       help='Resume Training from')
+    parser.add_argument('--retrain', type=int, default=0,
+                       help='Set 0 for using pre-trained model, 1 for retraining the model')
 
     args = parser.parse_args()
 
@@ -286,9 +283,7 @@ def main(_):
     if not os.path.exists(FLAGS.sample_dir):
         os.makedirs(FLAGS.sample_dir)
 
-    
-    FLAGS.retrain_ac_gan = args.retrain_ac_gan
-    FLAGS.retrain_imageEncoder = args.retrain_imageEncoder
+    FLAGS.retrain = args.retrain == 1
     
     if args.train_step == "ac_gan":
         train_ac_gan()
