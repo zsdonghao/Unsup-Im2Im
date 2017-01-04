@@ -1,29 +1,22 @@
 import os
-import sys
-import scipy.misc
 import pprint
 import numpy as np
-import time
 import tensorflow as tf
 import tensorlayer as tl
 from tensorlayer.layers import *
-from glob import glob
 from random import shuffle
 import argparse
 import data_loader
-
 from model import *
 from utils import *
 
 pp = pprint.PrettyPrinter()
 
-
 flags = tf.app.flags
-flags.DEFINE_integer("epoch", 200, "Epoch to train [25]")
+flags.DEFINE_integer("epoch", 12, "Epoch to train [12]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("weight_decay", 1e-5, "Weight decay for l2 loss")
-
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 64, "The number of batch images [64]")
 flags.DEFINE_integer("image_size", 64, "The size of image to use (will be center cropped) [108]")
@@ -34,13 +27,13 @@ flags.DEFINE_integer("sample_size", 64, "The number of sample images [64]")
 flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
 flags.DEFINE_integer("sample_step", 50, "The interval of generating sample. [500]")
 flags.DEFINE_integer("save_step", 100, "The interval of saveing checkpoints. [200]")
+flags.DEFINE_integer("imageEncoder_steps", 10000, "Number of train steps for image encoder")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("checkpoint_dir", "data/Models", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "data/samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
-flags.DEFINE_string("last_saved_ac_gan", "data/Models/model_epoch_3.ckpt", "Path to the last saved model")
 
 FLAGS = flags.FLAGS
 
@@ -94,29 +87,25 @@ def train_ac_gan():
     
     sess=tf.Session()
     tl.ops.set_gpu_fraction(sess=sess, gpu_fraction=0.998)
-    
-    saver = tf.train.Saver()
-    
     sess.run(tf.initialize_all_variables())
     
+    net_g_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_g.npz'.format(FLAGS.dataset))
+    net_d_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_d.npz'.format(FLAGS.dataset))
+    net_e_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_e.npz'.format(FLAGS.dataset))
 
-    saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
-    print "[*] Model Loaded"
-    
-    net_g_name = os.path.join(FLAGS.checkpoint_dir, 'net_g.npz')
-    net_d_name = os.path.join(FLAGS.checkpoint_dir, 'net_d.npz')
-    net_e_name = os.path.join(FLAGS.checkpoint_dir, 'net_e.npz')
-
-    # if not (os.path.exists(net_g_name) and os.path.exists(net_d_name)):
-    #     print("[!] Could not load weights from npz files")
-    # else:
-    #     net_g_loaded_params = tl.files.load_npz(name=net_g_name)
-    #     net_d_loaded_params = tl.files.load_npz(name=net_d_name)
-    #     net_e_loaded_params = tl.files.load_npz(name=net_e_name)
-    #     tl.files.assign_params(sess, net_g_loaded_params, net_g)
-    #     tl.files.assign_params(sess, net_d_loaded_params, net_d)
-    #     tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
-    #     print("[*] Loading checkpoints SUCCESS!")
+    if not FLAGS.retrain_ac_gan:
+        if (os.path.exists(net_g_name) and os.path.exists(net_d_name) and os.path.exists(net_e_name)):
+            print("[!] Could not load weights from npz files")
+        else:
+            net_g_loaded_params = tl.files.load_npz(name=net_g_name)
+            net_d_loaded_params = tl.files.load_npz(name=net_d_name)
+            net_e_loaded_params = tl.files.load_npz(name=net_e_name)
+            tl.files.assign_params(sess, net_g_loaded_params, net_g)
+            tl.files.assign_params(sess, net_d_loaded_params, net_d)
+            tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
+            print("[*] Loading checkpoints SUCCESS!")
+    else:
+        print "[*] Retraining AC GAN"
 
     class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
 
@@ -151,7 +140,6 @@ def train_ac_gan():
 
             if bn % FLAGS.save_step == 0:
                 print "[*]Saving Model, sampling images..."
-                save_path = saver.save(sess, "data/Models/model_ac_gan_{}.ckpt".format(epoch))
                 
                 tl.files.save_npz(net_g.all_params, name=net_g_name, sess=sess)
                 tl.files.save_npz(net_d.all_params, name=net_d_name, sess=sess)
@@ -182,29 +170,28 @@ def train_imageEncoder():
     z_noise = tf.placeholder(tf.float32, [FLAGS.batch_size, z_dim], name='z_noise')
     z_classes = tf.placeholder(tf.int64, shape=[FLAGS.batch_size, ], name='z_classes')
     
-    real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
+    # real_images =  tf.placeholder(tf.float32, [FLAGS.batch_size, FLAGS.output_size, FLAGS.output_size, FLAGS.c_dim], name='real_images')
 
     if FLAGS.class_embedding_size != None:
         net_z_classes = EmbeddingInputlayer(inputs = z_classes, vocabulary_size = 2, embedding_size = FLAGS.class_embedding_size, name ='classes_embedding')
     else:
         net_z_classes = InputLayer(inputs = tf.one_hot(z_classes), name ='classes_embedding')
     
-    # net_g produces sample images
+    
     net_g, g_logits = generator(tf.concat(1, [z_noise, net_z_classes.outputs]), is_train=False)
-    net_p = imageEncoder(real_images, FLAGS)
+    
+    net_p = imageEncoder(net_g.outputs)
+    
     net_g2, g2_logits = generator(tf.concat(1, [net_p.outputs, net_z_classes.outputs]), is_train=False, reuse = True)
 
     t_vars = tf.trainable_variables()
     p_vars = [var for var in t_vars if 'imageEncoder' in var.name]
     
-    net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g2.outputs, is_train = False, reuse = False)
-    _, _, _, _, df_real = discriminator(real_images, is_train = False, reuse = True)
+    # net_d, d_logits_fake, _, d_logits_fake_class, df_gen = discriminator(net_g2.outputs, is_train = False, reuse = False)
+    # _, _, _, _, df_real = discriminator(real_images, is_train = False, reuse = True)
 
-    # g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
-    # g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
-
-    p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(real_images, net_g2.outputs )))
-    p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
+    # p_loss_l2 = tf.reduce_mean(tf.square(tf.sub(real_images, net_g2.outputs )))
+    # p_loss_df = tf.reduce_mean(tf.square(tf.sub(df_gen.outputs, df_real.outputs )))
     
     # p_reg_loss = None
     # for p_var in p_vars:
@@ -213,68 +200,72 @@ def train_imageEncoder():
     #     else:
     #         p_reg_loss += FLAGS.weight_decay * tf.nn.l2_loss(p_var)
 
-    p_loss = p_loss_l2 #+ (p_loss_df * 0.5) #+ p_reg_loss
+    # p_loss = p_loss_l2 + (p_loss_df * 0.5) #+ p_reg_loss
+
+    p_loss = tf.reduce_mean( tf.square( tf.sub( net_p.outputs, z_noise) ))
     
     p_optim = tf.train.AdamOptimizer(FLAGS.learning_rate, beta1=FLAGS.beta1) \
                   .minimize(p_loss, var_list=p_vars)
 
     sess=tf.Session()
     tl.ops.set_gpu_fraction(sess=sess, gpu_fraction=0.998)
-    saver = tf.train.Saver()
+    
     sess.run(tf.initialize_all_variables())
     
     # RESTORE THE TRAINED AC_GAN
     
-    net_g_name = os.path.join(FLAGS.checkpoint_dir, 'net_g.npz')
-    net_d_name = os.path.join(FLAGS.checkpoint_dir, 'net_d.npz')
-    net_e_name = os.path.join(FLAGS.checkpoint_dir, 'net_e.npz')
+    net_g_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_g.npz'.format(FLAGS.dataset))
+    # net_d_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_d.npz'.format(FLAGS.dataset))
+    net_e_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_e.npz'.format(FLAGS.dataset))
 
-    if not (os.path.exists(net_g_name) and os.path.exists(net_d_name)):
+    if not (os.path.exists(net_g_name) and os.path.exists(net_e_name)):
         print("[!] Loading checkpoints failed!")
         return
     else:
         net_g_loaded_params = tl.files.load_npz(name=net_g_name)
-        net_d_loaded_params = tl.files.load_npz(name=net_d_name)
+        # net_d_loaded_params = tl.files.load_npz(name=net_d_name)
         net_e_loaded_params = tl.files.load_npz(name=net_e_name)
         
         tl.files.assign_params(sess, net_g_loaded_params, net_g2)
-        tl.files.assign_params(sess, net_d_loaded_params, net_d)
+        # tl.files.assign_params(sess, net_d_loaded_params, net_d)
         tl.files.assign_params(sess, net_e_loaded_params, net_z_classes)
         
         print("[*] Loading checkpoints SUCCESS!")
 
+    net_p_name = os.path.join(FLAGS.checkpoint_dir, '{}_net_p.npz'.format(FLAGS.dataset))
+    if not FLAGS.retrain_imageEncoder:
+        net_p_loaded_params = tl.files.load_npz(name=net_p_name)
+        tl.files.assign_params(sess, net_p_loaded_params, net_p)
+        print("[*] Loaded Pretrained Image Encoder!")
+    else:
+        print "[*] Retraining ImageEncoder"
 
-    net_p_name = os.path.join(FLAGS.checkpoint_dir, 'net_p.npz')
 
-    class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset)
-    all_files = class1_files + class2_files
-    shuffle(all_files)
-    print "all_files", len(all_files)
-    total_batches = len(all_files)/FLAGS.batch_size
-    print "Total_batces", total_batches
-    for epoch in range(FLAGS.epoch):
-        for bn in range(0, total_batches):
-            batch_z_classes = [0 if random.random() > 0.5 else 1 for i in range(FLAGS.batch_size)]
-            batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
-            batch_images = sess.run(net_g.outputs, feed_dict ={z_noise: batch_z, z_classes : batch_z_classes })
-            # gen_images = batch_images
-            gen_images, errP = sess.run([net_g2.outputs, p_loss], feed_dict={
-                z_classes : batch_z_classes,
-                real_images : batch_images
-            })
-            # print "epoch={}\t batch_no={}\t total_batches={}".format(epoch, bn, total_batches) 
-            print "p_loss={}\t epoch={}\t batch_no={}\t total_batches={}".format(errP, epoch, bn, total_batches) 
+    model_no = 0
+    for step in range(0, FLAGS.imageEncoder_steps):
+        batch_z_classes = [0 if random.random() > 0.5 else 1 for i in range(FLAGS.batch_size)]
+        batch_z = np.random.uniform(low=-1, high=1, size=(FLAGS.batch_size, z_dim)).astype(np.float32)
+        # batch_images = sess.run(net_g.outputs, feed_dict ={z_noise: batch_z, z_classes : batch_z_classes })
+        
+        batch_images, gen_images, _, errP = sess.run([net_g.outputs, net_g2.outputs, p_optim, p_loss], feed_dict={
+            z_noise : batch_z,
+            z_classes : batch_z_classes,
+        })
+        
+        print "p_loss={}\t step_no={}\t total_steps={}".format(errP, step, FLAGS.imageEncoder_steps) 
 
-            if bn % FLAGS.sample_step == 0:
-                print "[*]Sampling images"
-                combine_and_save_image_sets([batch_images, gen_images], FLAGS.sample_dir)
+        if step % FLAGS.sample_step == 0:
+            print "[*]Sampling images"
+            combine_and_save_image_sets([batch_images, gen_images], FLAGS.sample_dir)
 
-            if bn%FLAGS.save_step == 0:
-                print "[*]Saving Model"
-                save_path = saver.save(sess, "data/Models/model_step_2_epoch_{}.ckpt".format(epoch))    
-                tl.files.save_npz(net_p.all_params, name=net_p_name, sess=sess)
-                tl.files.save_npz(net_p.all_params, name=net_p_name + "_" + str(epoch), sess=sess)
-                print "[*]Model p saved"
+        if step % 2000 == 0:
+            model_no += 1
+
+        if step%FLAGS.save_step == 0:
+            print "[*]Saving Model"
+            tl.files.save_npz(net_p.all_params, name=net_p_name, sess=sess)
+            tl.files.save_npz(net_p.all_params, name=net_p_name + "_" + str(model_no), sess=sess)
+            print "[*]Model p saved"
 
 def main(_):
     parser = argparse.ArgumentParser()
@@ -282,13 +273,13 @@ def main(_):
     parser.add_argument('--train_step', type=str, default="ac_gan",
                        help='Step of the training : ac_gan, imageEncoder')
 
-    parser.add_argument('--resume_from_model', type=str, default="data/Models/model_epoch_3.ckpt",
+    parser.add_argument('--retrain_ac_gan', type=bool, default=False,
+                       help='Resume Training from')
+
+    parser.add_argument('--retrain_imageEncoder', type=bool, default=True,
                        help='Resume Training from')
 
     args = parser.parse_args()
-
-
-    # pp.pprint(flags.FLAGS.__flags)
 
     if not os.path.exists(FLAGS.checkpoint_dir):
         os.makedirs(FLAGS.checkpoint_dir)
@@ -296,15 +287,14 @@ def main(_):
         os.makedirs(FLAGS.sample_dir)
 
     
-    FLAGS.last_saved_ac_gan = args.resume_from_model
+    FLAGS.retrain_ac_gan = args.retrain_ac_gan
+    FLAGS.retrain_imageEncoder = args.retrain_imageEncoder
     
     if args.train_step == "ac_gan":
         train_ac_gan()
     
     elif args.train_step == "imageEncoder":
         train_imageEncoder()
-
-    """ Step 1: Train a G which generates plausible images conditioned on given class """
 
 if __name__ == '__main__':
     # load_data("celebA")
