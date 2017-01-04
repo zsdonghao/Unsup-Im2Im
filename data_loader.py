@@ -1,7 +1,7 @@
 import os
 from random import shuffle
 
-def load_data(dataset):
+def load_data(dataset, split = "train"):
     # RETURNS class1 file parths, class 2 file paths, a dictionary indicating the class of a file name.
     if dataset == 'celebA':
         attr_file = os.path.join("./data", dataset, "list_attr_celeba.txt")
@@ -29,15 +29,20 @@ def load_data(dataset):
         # return images
         class1_files = [ name for name in images if images[name]['Male'] == True]
         class2_files = [ name for name in images if images[name]['Male'] == False]
+        min_length = min(len(class1_files), len(class2_files))
+
+        train_length = int(0.75 * min_length)
+        
+        if split == "train":
+            class1_files = class1_files[0:train_length]
+            class2_files = class2_files[0:train_length]
+        elif split == "test":
+            class1_files = class1_files[train_length:min_length]
+            class2_files = class2_files[train_length:min_length]
+
 
         shuffle(class1_files)
         shuffle(class2_files)
-
-        min_length = min(len(class1_files), len(class2_files))
-        
-        class1_files = class1_files[0:min_length]
-        class2_files = class2_files[0:min_length]
-
 
         return class1_files, class2_files, class_flag
 
