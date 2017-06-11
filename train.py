@@ -88,7 +88,7 @@ def train_ac_gan():
     d_loss_real = tl.cost.sigmoid_cross_entropy(d_logits_real, tf.ones_like(d_logits_real), name='dreal')
     # discriminator: images from generator (fake) are labelled as 0
     # d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.zeros_like(d_logits_fake)))     # fake == 0
-    d_loss_fake = tl.cost.sigmoid_cross_entropy(d_logits_fake, tf.ones_like(d_logits_fake), name='dfake')
+    d_loss_fake = tl.cost.sigmoid_cross_entropy(d_logits_fake, tf.zeros_like(d_logits_fake), name='dfake')
     d_loss_class = tl.cost.cross_entropy(d_logits_real_class, z_classes, name='ce')                                           # cross-entropy
     d_loss = d_loss_real + d_loss_fake + d_loss_class
 
