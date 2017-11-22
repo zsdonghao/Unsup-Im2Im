@@ -37,7 +37,7 @@ python translate_image.py
 </div>
 </a>
 
-#### What to run different datasets?
+#### Want to use different datasets?
 * in `train.py` and `translate_image.py` modify the name of dataset `flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, obama_hillary]")`
 * write your own `data_loader` in `data_loader.py`
 
