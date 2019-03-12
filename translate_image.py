@@ -92,7 +92,7 @@ def main():
         # batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.output_size, is_grayscale = 0, random_flip = True) for batch_file in batch_files]
         # batch_z_classes = [1 if class_flag[file_name] == True else 0 for file_name in batch_files ]
 
-    if "inpainting" in FLAGS.dataset: # for celebA_inpainting
+    if "svhn" in FLAGS.dataset: # for celebA_inpainting
         original_images = copy.copy(batch_images)
         batch_images = threading_data(batch_images, fn=add_noise_fn, keep=0.8)
         # batch_images[:FLAGS.batch_size/2] = threading_data(batch_images[:FLAGS.batch_size/2], fn=add_noise_fn, keep=0.2)
@@ -111,7 +111,7 @@ def main():
         real_images : batch_images
     })
 
-    if "inpainting" in FLAGS.dataset:
+    if "svhn" in FLAGS.dataset:
         for idx, o_im in enumerate(original_images):
             tmp = copy.copy(o_im)
             mis_size = 30 # must be the same with utils.py/add_noise_fn()

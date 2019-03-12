@@ -26,7 +26,7 @@ flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
 flags.DEFINE_integer("sample_step", 500, "The interval of generating sample. [500]")
 flags.DEFINE_integer("save_step", 100, "The interval of saveing checkpoints. [200]")
 flags.DEFINE_integer("imageEncoder_steps", 30000, "Number of train steps for image encoder")
-flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, obama_hillary, svhn_inpainting]")
+flags.DEFINE_string("dataset", "svhn", "The name of dataset [celebA, obama_hillary, svhn, svhn_inpainting]")
 flags.DEFINE_string("checkpoint_dir", "data/Models", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "data/samples", "Directory name to save the image samples [samples]")
 # flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
@@ -34,7 +34,9 @@ flags.DEFINE_string("sample_dir", "data/samples", "Directory name to save the im
 # flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 
 FLAGS = flags.FLAGS
-
+# print(FLAGS)
+# print(type(FLAGS), FLAGS.save_step)
+# exit()
 os.system('mkdir data')
 os.system('mkdir {}'.format(FLAGS.sample_dir))
 os.system('mkdir {}'.format(FLAGS.sample_dir+'/step1'))
@@ -94,7 +96,7 @@ def train_ac_gan():
 
     # generator: try to make the the fake images look real (1)
     g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(d_logits_fake, tf.ones_like(d_logits_fake)))
-    g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes)
+    g_loss_class = tl.cost.cross_entropy(d_logits_fake_class, z_classes, name='g')
     g_loss = g_loss_fake + g_loss_class
 
     t_vars = tf.trainable_variables()
@@ -131,7 +133,7 @@ def train_ac_gan():
         print("[*] Retraining AC GAN")
 
     class1_files, class2_files, class_flag = data_loader.load_data(FLAGS.dataset, split = "train")
-
+    # exit(class1_files[0:10])
     is_class_balance = True # class balancing
 
     if is_class_balance:
@@ -174,15 +176,16 @@ def train_ac_gan():
             batch_images = threading_data(batch_images, fn=distort_fn)
 
 
-
-            if "inpainting" in FLAGS.dataset: # for celebA_inpainting
+            if "svhn" in FLAGS.dataset: # for celebA_inpainting
                 batch_images[:int(FLAGS.batch_size/2)] = threading_data(batch_images[:int(FLAGS.batch_size/2)], fn=add_noise_fn, keep=0.8)
                 batch_z_classes = [0]*int(FLAGS.batch_size/2) + [1]*int(FLAGS.batch_size/2)
             else:
                 batch_z_classes = [0 if class_flag[file_name] == True else 1 for file_name in batch_files ]
                 # batch_images = [get_image(batch_file, FLAGS.image_size, is_crop=FLAGS.is_crop, resize_w=FLAGS.image_size, is_grayscale = 0, random_flip = True) for batch_file in batch_files]
-            # print(batch_images.shape, np.max(batch_images), np.min(batch_images))
-            # exit()
+
+            # save_images(batch_images, [8,8], '_batch_images.png')
+            # print(batch_images.shape, batch_images.min(), batch_images.max())
+            # print(batch_z_classes)
 
             errD, _ = sess.run([d_loss, d_optim], feed_dict={
                 z_noise: batch_z,
@@ -331,7 +334,7 @@ def train_imageEncoder():
             tl.files.save_npz(net_p.all_params, name=net_p_name + "_" + str(model_no), sess=sess)
             print("[*] Model p(encoder) saved")
 
-def main(_):
+def main():#_):
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--train_step', type=str, default="ac_gan",
@@ -357,4 +360,5 @@ def main(_):
 
 if __name__ == '__main__':
     # load_data("celebA")
-    tf.app.run()
+    # tf.app.run()
+    main()

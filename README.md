@@ -8,25 +8,30 @@
 
 ##### Paper: [Unsupervised Image to Image Translation with Generative Adversarial Networks](https://arxiv.org/abs/1701.02676)
 
+### Requirements
+* TensorFlow 1.0.0
+* TensorLayer 1.3.11
+* Ubuntu
+
 ### Dataset
 * Before training the network, please prepare the data
 * CelebA [download](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
-* SVHN [download]()
+* Cropped SVHN [download](http://ufldl.stanford.edu/housenumbers/)
 * MNIST [download](https://github.com/myleott/mnist_png/blob/master/mnist_png.tar.gz), and put to `data/mnist_png`
 
 ### Usage
 
 #### Step 1: Learning shared feature
 ```
-python train.py --train_step="ac_gan" --retrain=1
+python3 train.py --train_step="ac_gan" --retrain=1
 ```
 #### Step 2: Learning image encoder
 ```
-python train.py --train_step="imageEncoder" --retrain=1
+python3 train.py --train_step="imageEncoder" --retrain=1
 ```
 #### Step 3: Translation
 ```
-python translate_image.py
+python3 translate_image.py
 ```
 * Samples of all steps will be saved to data/samples/
 

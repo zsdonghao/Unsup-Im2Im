@@ -9,7 +9,7 @@ from tensorlayer.prepro import *
 FLAGS = tf.app.flags.FLAGS
 
 def add_noise_fn(x, keep):
-    """ Add noise on a image for inpainting experiments """
+    """ Add noise on an image for inpainting experiments """
     ## random noise
     # x = (x + 1.) / 2.
     # x = drop(x, keep=keep)
@@ -23,12 +23,12 @@ def add_noise_fn(x, keep):
 
 
 def get_image_fn(path):
-    """ Input a image path, return a image array """
+    """ Input an image path, return an image array """
     return scipy.misc.imread(path).astype(np.float)
 
 def distort_fn(x):
-    """ Data augmentation for a image """
-    if FLAGS.dataset not in ['svhn_inpainting', 'mnist_svhn']:
+    """ Data augmentation for an image """
+    if 'svhn' not in FLAGS.dataset: #FLAGS.dataset not in ['svhn_inpainting', 'mnist_svhn']:
         x = flip_axis(x, axis=1, is_random=True)
 
     if FLAGS.dataset == 'mnist_svhn': # no data augmentation

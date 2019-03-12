@@ -18,7 +18,7 @@ def load_data(dataset, split = "train", percentage=0.8):
 
     Parameters
     ----------
-    dataset : string, dataset name, "celebA", "youtube_videos", "obama_hillary"
+    dataset : string, dataset name, "celebA", "obama_hillary", "svhn"
     split : "train" or "test" for celebA
         Returns the directory of training files or testing files
     percentage : float
@@ -82,7 +82,7 @@ def load_data(dataset, split = "train", percentage=0.8):
 
         return class1_files, class2_files, class_flag
 
-    # if dataset == 'celebA_inpainting': #TODO
+    # elif dataset == 'celebA_inpainting': #TODO
     #     class1_data_dir = './data/celebA'
     #     # class1_files = []
     #     # for dirpath, dirnames, filenames in os.walk(class1_data_dir):
@@ -123,8 +123,7 @@ def load_data(dataset, split = "train", percentage=0.8):
     #
     #     return class1_files, class2_files, class_flag
 
-
-    # if dataset == 'youtube_videos':
+    # elif dataset == 'youtube_videos':
     #     data_dir = './data/faces/imgs/aligned_images_DB'
     #
     #     subd1 = "Gabi_Zimmer"
@@ -166,19 +165,18 @@ def load_data(dataset, split = "train", percentage=0.8):
     #     return class1_files, class2_files, class_flag
     #     # print class2_files
 
-    if dataset == "obama_hillary":
-        class1_data_dir = './data/obama_hillary/obama'
+    elif dataset == "obama_hillary":
+        class1_data_dir = 'data/obama_hillary/obama'
         class1_files = []
         for dirpath, dirnames, filenames in os.walk(class1_data_dir):
             for filename in [f for f in filenames if f.endswith(".jpg")]:
                 class1_files.append(os.path.join(dirpath, filename))
 
-        class2_data_dir = './data/obama_hillary/hillary'
+        class2_data_dir = 'data/obama_hillary/hillary'
         class2_files = []
         for dirpath, dirnames, filenames in os.walk(class2_data_dir):
             for filename in [f for f in filenames if f.endswith(".jpg")]:
                 class2_files.append(os.path.join(dirpath, filename))
-
 
         if split == "train":
             class1_files = class1_files[0:int(len(class1_files)*percentage)]
@@ -231,7 +229,21 @@ def load_data(dataset, split = "train", percentage=0.8):
     #
     #     return class1_files, class2_files, class_flag
 
-    if dataset == "svhn_inpainting":
+    elif dataset == 'svhn':
+        if split == "train":
+            data_dir = 'data/svhn/train'
+        elif split == 'test':
+            data_dir = 'data/svhn/test'
+        # file_list = tl.files.load_file_list(path=data_dir, regx='\.(png)', printable=False)
+        file_list = []
+        for dirpath, dirnames, filenames in os.walk(data_dir):
+            for filename in [f for f in filenames if f.endswith(".png")]:
+                file_list.append(os.path.join(dirpath, filename))
+        _file_list = list(file_list)
+        shuffle(_file_list)
+        return file_list, _file_list, None
+
+    elif dataset == "svhn_inpainting":
 
         data_dir = './data/svhn/'
         file_list = tl.files.load_file_list(path=data_dir, regx='\.(jpg)', printable=False)
@@ -259,7 +271,7 @@ def load_data(dataset, split = "train", percentage=0.8):
 
         return class1_files, class2_files, class_flag
 
-    if dataset == "mnist_svhn":
+    elif dataset == "mnist_svhn":
         import scipy.misc
         # data_dir1 = './data/svhn/'
         # file_list = tl.files.load_file_list(path=data_dir1, regx='\.(jpg)', printable=False)
