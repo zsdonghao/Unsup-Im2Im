@@ -11,6 +11,7 @@
 ### Requirements
 * TensorFlow 1.0.0
 * TensorLayer 1.3.11
+* CUDA 8
 * Ubuntu
 
 ### Dataset
