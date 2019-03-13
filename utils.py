@@ -15,7 +15,7 @@ def add_noise_fn(x, keep):
     # x = drop(x, keep=keep)
     # x = x * 2. - 1.
     ## remove central reigion
-    mis_size = 30 # 20
+    mis_size = 20 #30 # 20
     s = int((FLAGS.image_size-mis_size)/2)
     e = s + mis_size
     x[s:e , s:e, :] = -1 # min of image is -1

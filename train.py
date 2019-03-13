@@ -186,6 +186,7 @@ def train_ac_gan():
             # save_images(batch_images, [8,8], '_batch_images.png')
             # print(batch_images.shape, batch_images.min(), batch_images.max())
             # print(batch_z_classes)
+            # exit()
 
             errD, _ = sess.run([d_loss, d_optim], feed_dict={
                 z_noise: batch_z,
