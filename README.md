@@ -12,7 +12,7 @@
 * TensorFlow 1.0.0
 * TensorLayer 1.3.11
 * CUDA 8
-* Ubuntu
+* Ubuntu 
 
 ### Dataset
 * Before training the network, please prepare the data
